@@ -1,50 +1,58 @@
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy_serializer import serializerMixin
+from sqlalchemy_serializer import SerializerMixin
 
-db = SQLALchemy()
+db = SQLAlchemy()
 
-class player(db.Model, serializerMixin):
-    __tablename__ = 'player'
 
-    id = db.Column(db.Integer, Primary_key=True) ## number of the prayer(1, 2, 3)
-    name = db.Column(db.String(50), nullable=False) ## name of the player 
-    position = db.Colum(db.Integer, default=0) ## every pakyer should start from zero 
-    money = db.Column(db. Integer, default=1500) ## start with 1500 as the money
-    in_jail = db.Column(db.Boolean, default= False )##should say if the person is in jail or not 
+class Player(db.Model, SerializerMixin):
+    __tablename__ = 'players'
 
-    properties = db.relationship("property"), back_populates="owner"
+    id = db.Column(db.Integer, primary_key=True)  # number of the player (1, 2, 3)
+    name = db.Column(db.String(50), nullable=False)  # name of the player
+    position = db.Column(db.Integer, default=0)  # start from 0
+    money = db.Column(db.Integer, default=1500)  # start with 1500 as the money
+    in_jail = db.Column(db.Boolean, default=False)  # if the person is in jail or not
 
-    def to_dict(self):
-        return{
-            "id": self.id,
-            "name": self.name,
-            "position": self.position,
-            "money": self.money,
-            "in_jail": self.in_jail,
-        }
+    # one player -> many properties
+    properties = db.relationship("Property", back_populates="owner")
 
-class property(db.Model, serializerMixin): ## we are creating a table in the database
+    serialize_rules = ('-properties.owner',)
+
+
+
+class Property(db.Model, SerializerMixin):
     __tablename__ = 'properties'
 
-    id = db.Column(db.Integer, Primary_key=True) ## integer is a number
-    name = db.Column(db.String(100), nullable=False) ## name of the player 
-    price = db.Colum(db.Integer, nullable=False) ## every pakyer should start from zero 
-    rent = db.Column(db. Integer, nullable=False)
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    price = db.Column(db.Integer, nullable=False)
+    rent = db.Column(db.Integer, nullable=False)
 
-    owner_id = db.Column(db.Interger, db.ForeignKey('players.id')) ## this is a foreignKeyit points to the player
-    owner = db.relationship("player", backref="properties")## this is relationship , connects models 
+    color_set = db.Column(db.String(50), nullable=False, default='Other')  # Brown, Railroad, Utility, etc.
+    houses = db.Column(db.Integer, default=0)  # 0–4 houses, 5 = hotel
+    is_mortgaged = db.Column(db.Boolean, default=False)
 
-class user(db.Model, serializerMixin): ## we are creating a table in the database
-    __tablename__ = 'user'
+    owner_id = db.Column(db.Integer, db.ForeignKey('players.id'))  # foreign key -> Player
+    owner = db.relationship("Player", back_populates="properties")
 
-    id = db.Column(db.Integer, Primary_key=True) 
-    username = db.Column(db.String, unique=True, nullable=False) ## dont repeat the user
-    ##bio = db.Colum(db.string)
-    ##image_url = db.Column(db.String)
-    def to_dict(self):
-        return{
-            "id": self.id,
-            "username": self.username
-        }
+    serialize_rules = ('-owner.properties',)
 
 
+
+class ChestCard(db.Model, SerializerMixin):
+    __tablename__ = 'cards'
+
+    id = db.Column(db.Integer, primary_key=True)
+    type = db.Column(db.String, nullable=False)  # "chance" or "community"
+    effect = db.Column(db.String, nullable=False)  # description of effect
+
+
+class GameProgram(db.Model, SerializerMixin):
+    __tablename__ = 'game_states'
+
+    id = db.Column(db.Integer, primary_key=True)
+    current_player_id = db.Column(db.Integer, db.ForeignKey("players.id"))
+    turn_number = db.Column(db.Integer, default=1)
+
+    # relationship to know who is the current player
+    current_player = db.relationship("Player")
