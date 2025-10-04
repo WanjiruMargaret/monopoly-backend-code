@@ -1,0 +1,49 @@
+from app import app, db
+# Import BOTH versions
+from models import Player, Property, ChestCard, GameState
+from models import PlayerManual, PropertyManual, CardManual, GameStateManual
+
+with app.app_context():
+    db.drop_all()
+    db.create_all()
+
+    # --- Option 1: Use Yuffis' SerializerMixin models ---
+    p1 = Player(name="Player 1")
+    p2 = Player(name="Player 2")
+    db.session.add_all([p1, p2])
+
+    board_props = [
+        Property(name="Mediterranean Avenue", price=60, rent=2, color_set="Brown"),
+        Property(name="Baltic Avenue", price=60, rent=4, color_set="Brown"),
+        Property(name="Boardwalk", price=400, rent=50, color_set="Dark Blue"),
+    ]
+    db.session.add_all(board_props)
+
+    chance = ChestCard(type="chance", effect="Collect $50")
+    community = ChestCard(type="community", effect="Pay $50")
+    db.session.add_all([chance, community])
+
+    game_state = GameState(current_player_id=1, turn_number=1)
+    db.session.add(game_state)
+
+    # --- Option 2: Use your Manual to_dict() models ---
+    p3 = PlayerManual(name="Player 3")
+    p4 = PlayerManual(name="Player 4")
+    db.session.add_all([p3, p4])
+
+    board_props_manual = [
+        PropertyManual(name="Park Place", price=350, rent=35),
+        PropertyManual(name="Illinois Avenue", price=240, rent=20),
+    ]
+    db.session.add_all(board_props_manual)
+
+    card1 = CardManual(type="chance", text="Advance to Go", effect="move_start")
+    card2 = CardManual(type="community", text="Doctor's fee, pay $50", effect="pay")
+    db.session.add_all([card1, card2])
+
+    game_state_manual = GameStateManual(current_player=0, turn_number=1)
+    db.session.add(game_state_manual)
+
+    # Commit everything
+    db.session.commit()
+    print("✅ Database seeded with both model versions!")
