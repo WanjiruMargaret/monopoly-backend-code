@@ -4,12 +4,17 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+
 flask = "*"
 flask-cors = "*"
 flask-sqlalchemy = "*"
+
 flask-migrate = "*"
 
 [dev-packages]
 
 [requires]
 python_version = "3.13"
+
+python_version = "3.8"
+
