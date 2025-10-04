@@ -104,7 +104,7 @@ class PropertyManual(db.Model):
         }
 
 
-class CardManual(db.Model):
+class Card(db.Model):
     __tablename__ = 'cards_manual'
 
     id = db.Column(db.Integer, primary_key=True)

@@ -2,6 +2,8 @@ from flask import Flask
 from flask_migrate import Migrate
 from models import db,Player, Property, Card, GameState # your Monopoly models
 from game_logic import roll_dice_logic, buy_property_logic, apply_card_logic
+from flask_cors import CORS
+
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///monopoly.db"

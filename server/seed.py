@@ -1,7 +1,7 @@
 from app import app, db
 # Import BOTH versions
 from models import Player, Property, ChestCard, GameState
-from models import PlayerManual, PropertyManual, CardManual, GameStateManual
+from models import PlayerManual,Card, PropertyManual, GameStateManual
 
 with app.app_context():
     db.drop_all()
@@ -37,8 +37,8 @@ with app.app_context():
     ]
     db.session.add_all(board_props_manual)
 
-    card1 = CardManual(type="chance", text="Advance to Go", effect="move_start")
-    card2 = CardManual(type="community", text="Doctor's fee, pay $50", effect="pay")
+    card1 = Card(type="chance", text="Advance to Go", effect="move_start")
+    card2 = Card(type="community", text="Doctor's fee, pay $50", effect="pay")
     db.session.add_all([card1, card2])
 
     game_state_manual = GameStateManual(current_player=0, turn_number=1)
