@@ -12,6 +12,8 @@ with app.app_context():
     p2 = Player(name="Player 2")
     db.session.add_all([p1, p2])
 
+    # NOTE: These properties also need the 'position' column added 
+    # if you update the base Property model similarly.
     board_props = [
         Property(name="Mediterranean Avenue", price=60, rent=2, color_set="Brown"),
         Property(name="Baltic Avenue", price=60, rent=4, color_set="Brown"),
@@ -31,9 +33,10 @@ with app.app_context():
     p4 = PlayerManual(name="Player 4")
     db.session.add_all([p3, p4])
 
+    # 🔑 FIX APPLIED HERE: Added the 'position' argument for each property.
     board_props_manual = [
-        PropertyManual(name="Park Place", price=350, rent=35),
-        PropertyManual(name="Illinois Avenue", price=240, rent=20),
+        PropertyManual(position=37, name="Park Place", price=350, rent=35), # Park Place is at board index 37
+        PropertyManual(position=24, name="Illinois Avenue", price=240, rent=20), # Illinois Avenue is at board index 24
     ]
     db.session.add_all(board_props_manual)
 

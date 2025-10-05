@@ -83,10 +83,14 @@ class PlayerManual(db.Model):
         }
 
 
+
 class PropertyManual(db.Model):
     __tablename__ = 'properties_manual'
 
     id = db.Column(db.Integer, primary_key=True)
+    # 🔑 FIX: Add a position field to link the property to a board space (0-39)
+    position = db.Column(db.Integer, unique=True, nullable=False) 
+    
     name = db.Column(db.String, nullable=False)
     price = db.Column(db.Integer)
     rent = db.Column(db.Integer)
@@ -97,10 +101,11 @@ class PropertyManual(db.Model):
     def to_dict(self):
         return {
             "id": self.id,
+            "position": self.position,
             "name": self.name,
             "price": self.price,
             "rent": self.rent,
-            "owner": self.owner_id
+            "owner_id": self.owner_id, # Changed 'owner' to 'owner_id' for clarity 
         }
 
 
