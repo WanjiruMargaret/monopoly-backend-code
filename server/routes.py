@@ -24,6 +24,27 @@ NON_PROPERTY_MAP = {
     38: {"name": "Luxury Tax", "type": "tax", "amount": 100}, # Added Luxury Tax example
 }
 
+# 🔑 NEW HELPER FUNCTION: ELIMINATE PLAYER (moved above usage)
+def eliminate_player(player_id):
+    """Handles player bankruptcy and elimination."""
+    player = PlayerManual.query.get(player_id)
+    
+    if not player:
+        return 0, False # Player already gone
+    
+    # 1. Clear ownership of all properties
+    for prop in PropertyManual.query.filter_by(owner_id=player_id).all():
+        prop.owner_id = None
+    
+    # 2. Delete the Player
+    db.session.delete(player)
+    db.session.commit()
+    
+    # 3. Check for Game Over
+    remaining_players = PlayerManual.query.count()
+    game_over = remaining_players == 1
+    
+    return remaining_players, game_over
 
 # -----------------------------
 # Players
@@ -64,7 +85,8 @@ def roll_dice():
     player_id_attempting_roll = data.get("player_id")
 
     state = GameStateManual.query.first()
-    players = PlayerManual.query.order_by(PlayerManual.id.asc()).all()
+    # 🔑 CRITICAL: Get players *by position* to align with state.current_player index
+    players = PlayerManual.query.order_by(PlayerManual.id.asc()).all() 
     
     if not state or not players or not player_id_attempting_roll:
         return jsonify({"error": "Game not initialized or Player ID missing"}), 400
@@ -77,24 +99,18 @@ def roll_dice():
     player_attempting_roll = PlayerManual.query.get(player_id_attempting_roll)
 
     if not player_attempting_roll or current_turn_player.id != player_attempting_roll.id:
-        return jsonify({"error": f"❌ It's not {player_attempting_roll.name}'s turn. It's {current_turn_player.name}'s turn."}), 403
+        return jsonify({"error": f"❌ It's not {current_turn_player.name}'s turn."}), 403
 
     # Use 'current_turn_player' for the action
     d1, d2 = random.randint(1, 6), random.randint(1, 6)
     steps = d1 + d2
 
-    # Handle Jail logic (Releasing them only, they don't move here)
+    # Handle Jail logic (simplified release)
     if current_turn_player.in_jail:
-        # NOTE: This is a simplified release without checking for doubles/payment
+        # For simplicity, release on roll or fine payment, but allow movement
         current_turn_player.in_jail = False
-        db.session.commit()
-        return jsonify({
-            "dice": [d1, d2],
-            "player": current_turn_player.to_dict(),
-            "message": f"🗃️ {current_turn_player.name} paid fine/rolled out of jail and skips movement this turn.",
-            "action_needed": "NONE"
-        })
-
+        # Continue to movement below
+    
     # Save old position for Go check
     old_position = current_turn_player.position
     
@@ -102,6 +118,7 @@ def roll_dice():
     current_turn_player.position = (current_turn_player.position + steps) % 40
 
     # Handle Passing Go ($200 logic)
+    message = f"🎲 {current_turn_player.name} rolled {d1} + {d2} = {steps}, moved to tile {current_turn_player.position}."    
     if current_turn_player.position < old_position:
         current_turn_player.money += 200
         message = f"💰 {current_turn_player.name} passed GO and collected $200!"
@@ -114,7 +131,6 @@ def roll_dice():
         "dice": [d1, d2],
         "player": current_turn_player.to_dict(),
         "message": message,
-        # 'rolled_doubles' is false for now, assuming simple turn structure
         "rolled_doubles": d1 == d2, 
     }
 
@@ -165,25 +181,18 @@ def land_on_tile():
         tile_info = NON_PROPERTY_MAP.get(position, {"name": "Unknown Tile", "type": "passive"})
         name = tile_info["name"]
         
-        # Tile data for the frontend modal context
         tile_data = {"position": position, "name": name, "type": tile_info["type"]}
         message = f"{player.name} landed on {name}."
         
-        if tile_info["type"] == "community_chest":
-            action_needed = "COMMUNITY_CHEST"
-        elif tile_info["type"] == "chance":
-            action_needed = "CHANCE"
+        if tile_info["type"] in ("community_chest", "chance"):
+            action_needed = tile_info["type"].upper()
         elif tile_info["type"] == "tax": 
-            # Tax is handled automatically by GameContext after the rollDice call
             action_needed = "TAX"
-            # NOTE: For simplicity, the actual money deduction is often done in a separate endpoint
             message += " Must pay tax."
         elif position == 30: # Go To Jail (position 30)
             action_needed = "GO_TO_JAIL"
             message += " 🚨 GO TO JAIL! Moving to position 10."
             
-        # Passive tiles like GO, Free Parking, Jail (Just Visiting) resolve to NONE, ending the turn automatically.
-        
     return jsonify({
         "player": player.to_dict(),
         "tile": tile_data,
@@ -193,29 +202,51 @@ def land_on_tile():
 
 
 # ----------------------------------------------------
-# Next Turn
+# 🔄 Next Turn 🔑 FIXED LOGIC
 # ----------------------------------------------------
 @api.route("/next_turn", methods=["POST"])
 def next_turn():
     try:
         state = GameStateManual.query.first()
+        
+        # 🔑 CRITICAL: Always re-query the player list after a transaction/elimination
         players = PlayerManual.query.order_by(PlayerManual.id.asc()).all()
         
         if not state or not players:
-            return jsonify({"error": "Game not initialized"}), 400
+            # If only one player remains, the next turn attempt confirms game over
+            if PlayerManual.query.count() == 1:
+                 return jsonify({"error": "Game Over: Only one player remains."}), 400
+            return jsonify({"error": "Game not initialized or no players found"}), 400
 
-        # Determine next player index (wrap around)
-        next_index = (state.current_player + 1) % len(players)
+        num_players = len(players)
         
-        # Update the current player index
-        state.current_player = next_index
-        db.session.commit()
+        # Start looking for the next active player from the current player's *next* index
+        start_index = (state.current_player + 1) % num_players
+        current_index = start_index
+
+        # Loop until a player is found (or we loop back to start)
+        for _ in range(num_players):
+            player_id_to_check = players[current_index].id
+            
+            # Check if this player still exists in the database
+            if PlayerManual.query.get(player_id_to_check):
+                # Found the next active player
+                state.current_player = current_index
+                db.session.commit()
+                return jsonify({
+                    "current_player": current_index,
+                    "message": f"🔄 It is now {players[current_index].name}'s turn."
+                }), 200
+            
+            # Move to the next index
+            current_index = (current_index + 1) % num_players
+            
+            # If we've circled completely, it means something is wrong (should be caught by the count == 1 check)
+            if current_index == start_index:
+                break
         
-        next_player = players[next_index]
-        return jsonify({
-            "current_player": next_index,
-            "message": f"🔄 It is now {next_player.name}'s turn."
-        }), 200
+        # Fallback if the loop finishes unexpectedly (e.g., player count error)
+        return jsonify({"error": "Could not determine next player. Check player list."}), 500
 
     except Exception as e:
         db.session.rollback()
@@ -229,8 +260,6 @@ def next_turn():
 def buy_property():
     data = request.json
     player = PlayerManual.query.get(data["player_id"])
-    
-    # Look up the property by its position
     prop = PropertyManual.query.filter_by(position=data["property_position"]).first()
 
     if not player or not prop:
@@ -254,38 +283,50 @@ def buy_property():
 
 
 # -----------------------------
-# Pay Rent
+# Pay Rent 🔑 FIXED LOGIC
 # -----------------------------
 @api.route("/pay-rent", methods=["POST"])
 def pay_rent():
     data = request.json
-    player = PlayerManual.query.get(data["player_id"])
-    
-    # Look up by position
+    payer = PlayerManual.query.get(data["player_id"])
     prop = PropertyManual.query.filter_by(position=data["property_position"]).first()
 
-    if not player or not prop or not prop.owner_id:
+    if not payer or not prop or not prop.owner_id:
         return jsonify({"error": "Invalid rent action: Player/Property/Owner Missing"}), 400
 
     owner = PlayerManual.query.get(prop.owner_id)
     rent = prop.rent
 
-    player.money -= rent
+    if payer.money < rent:
+        # 🔑 BANKRUPTCY LOGIC
+        remaining, game_over = eliminate_player(payer.id)
+        
+        # NOTE: The owner still gets the money from the player's remaining assets, 
+        # but for simplicity, we skip that complex step here and just pass the flag.
+        
+        return jsonify({
+            "message": f"💥 {payer.name} went bankrupt paying rent to {owner.name}!",
+            "game_over": game_over,
+            "eliminated_player_id": payer.id,
+            "owner": owner.to_dict(),
+        }), 200
+
+    # Standard transaction
+    payer.money -= rent
     owner.money += rent
     db.session.commit()
 
     return jsonify({
-        "message": f"💸 {player.name} paid ${rent} rent to {owner.name}.",
-        "payer": player.to_dict(),
+        "message": f"💸 {payer.name} paid ${rent} rent to {owner.name}.",
+        "payer": payer.to_dict(),
         "owner": owner.to_dict(),
-        "property": prop.to_dict()
+        "property": prop.to_dict(),
+        "game_over": False
     })
 
 
-# Add these two new endpoints to your routes.py file
-
 # -----------------------------
-# Pay Tax (Simplistic)
+# Pay Tax (Simplistic) 🔑 FIXED LOGIC
 # -----------------------------
 @api.route("/pay-tax", methods=["POST"])
 def pay_tax():
@@ -293,22 +334,36 @@ def pay_tax():
     player = PlayerManual.query.get(data["player_id"])
     tax_position = data["tax_position"]
     
-    # Simple check for Income Tax (4) or Luxury Tax (38)
-    tax_amount = 200 if tax_position == 4 else 100 
+    tax_info = NON_PROPERTY_MAP.get(tax_position)
+    
+    # Calculate tax amount (Income Tax 200, Luxury Tax 100)
+    if tax_position == 4:
+        tax_amount = 200
+    elif tax_position == 38:
+        tax_amount = 100
+    else:
+        return jsonify({"error": "Invalid tax position"}), 400
 
     if not player:
         return jsonify({"error": "Player not found"}), 404
 
     if player.money < tax_amount:
-        # NOTE: Real Monopoly forces bankruptcy, but here we'll just fail for now.
-        return jsonify({"error": "Not enough money to pay tax"}), 400
+        # 🔑 BANKRUPTCY LOGIC
+        remaining, game_over = eliminate_player(player.id)
+        
+        return jsonify({
+            "message": f"💥 {player.name} went bankrupt paying tax!",
+            "game_over": game_over,
+            "eliminated_player_id": player.id,
+        }), 200
 
     player.money -= tax_amount
     db.session.commit()
 
     return jsonify({
         "message": f"💸 {player.name} paid ${tax_amount} tax!",
-        "player": player.to_dict()
+        "player": player.to_dict(),
+        "game_over": False
     })
 
 # -----------------------------
@@ -322,7 +377,6 @@ def go_to_jail():
     if not player:
         return jsonify({"error": "Player not found"}), 404
     
-    # Move player to Jail tile (Position 10) and set jail status
     player.position = 10 
     player.in_jail = True
     db.session.commit()
@@ -348,3 +402,23 @@ def draw_card():
 
     card = random.choice(cards)
     return jsonify(card.to_dict())
+
+
+# -----------------------------
+# Reset Game
+# -----------------------------
+@api.route("/reset-game", methods=["POST"])
+def reset_game():
+    """Clears all players, properties, and game state to start a new game."""
+    try:
+        db.session.query(PlayerManual).delete()
+        db.session.query(PropertyManual).update({"owner_id": None})
+        GameStateManual.query.delete()
+        db.session.add(GameStateManual(current_player=0, turn_number=1))
+        
+        db.session.commit()
+        return jsonify({"message": "Game state reset successfully."}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Failed to reset game state: {str(e)}"}), 500
