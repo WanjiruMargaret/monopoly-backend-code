@@ -7,6 +7,7 @@ from routes import api  # your Blueprint
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///monopoly.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.secret_key = 'your_super_secret_and_unique_key_here'
 
 # Initialize extensions
 db.init_app(app)
