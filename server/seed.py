@@ -86,9 +86,27 @@ with app.app_context():
     ]
     db.session.add_all(board_props_manual)
 
-    card1 = Card(type="chance", text="Advance to Go", effect="move_start")
-    card2 = Card(type="community", text="Doctor's fee, pay $50", effect="pay")
-    db.session.add_all([card1, card2])
+    # Chance Cards
+    chance_cards = [
+        Card(card_type="chance", description="Advance to Go (Collect $200)", effect_type="move", value=0),
+        Card(card_type="chance", description="Bank pays you dividend of $50", effect_type="money", value=50),
+        Card(card_type="chance", description="Go Back 3 Spaces", effect_type="move", value=-3),
+        Card(card_type="chance", description="Go to Jail", effect_type="move", value=10),
+        Card(card_type="chance", description="Pay poor tax of $15", effect_type="money", value=-15),
+        Card(card_type="chance", description="Get Out of Jail Free", effect_type="get_out_of_jail", value=0),
+    ]
+    
+    # Community Chest Cards
+    community_cards = [
+        Card(card_type="community_chest", description="Advance to Go (Collect $200)", effect_type="move", value=0),
+        Card(card_type="community_chest", description="Bank error in your favor. Collect $200", effect_type="money", value=200),
+        Card(card_type="community_chest", description="Doctor's fee. Pay $50", effect_type="money", value=-50),
+        Card(card_type="community_chest", description="From sale of stock you get $50", effect_type="money", value=50),
+        Card(card_type="community_chest", description="Go to Jail", effect_type="move", value=10),
+        Card(card_type="community_chest", description="Get Out of Jail Free", effect_type="get_out_of_jail", value=0),
+    ]
+    
+    db.session.add_all(chance_cards + community_cards)
 
     game_state_manual = GameStateManual(current_player=0, turn_number=1)
     db.session.add(game_state_manual)

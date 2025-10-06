@@ -141,26 +141,39 @@ class PropertyManual(db.Model):
 
 class Card(db.Model):
     __tablename__ = 'cards_manual'
-    # ... (rest of Card unchanged) ...
+    
     id = db.Column(db.Integer, primary_key=True)
-    type = db.Column(db.String) 
-    text = db.Column(db.String)
-    effect = db.Column(db.String) 
-
-    def to_dict(self):
-        return {"id": self.id, "type": self.type, "text": self.text}
-
-
-class GameStateManual(db.Model):
-    __tablename__ = 'game_states_manual'
-    # ... (rest of GameStateManual unchanged) ...
-    id = db.Column(db.Integer, primary_key=True)
-    current_player = db.Column(db.Integer, default=0)
-    turn_number = db.Column(db.Integer, default=1)
+    card_type = db.Column(db.String, nullable=False)  # "chance" or "community_chest"
+    description = db.Column(db.String, nullable=False)  # Card text
+    effect_type = db.Column(db.String, nullable=False)  # "money", "move", "get_out_of_jail"
+    value = db.Column(db.Integer, default=0)  # Amount for money/move effects
 
     def to_dict(self):
         return {
             "id": self.id,
-            "current_player": self.current_player,
-            "turn_number": self.turn_number
+            "card_type": self.card_type,
+            "description": self.description,
+            "effect_type": self.effect_type,
+            "value": self.value
+        }
+
+
+class GameStateManual(db.Model):
+    __tablename__ = 'game_states_manual'
+    id = db.Column(db.Integer, primary_key=True)
+    turn_number = db.Column(db.Integer, default=1, nullable=False)
+    current_player = db.Column(db.Integer, default=0, nullable=False)
+
+    # 👇 CRITICAL FIX: Add the action_required column
+    action_required = db.Column(db.String, default="ROLL", nullable=False)
+    # 👆 This column stores the current required player action (e.g., "ROLL", "BUY", "PAY_RENT")
+
+    # ... other columns (if any) ...
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'turn_number': self.turn_number,
+            'current_player': self.current_player,
+            'action_required': self.action_required, # Ensure this is also included in the dict
         }
