@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, session
 # ✅ FIX: Changed relative import (.models) to absolute import (models)
-from models import db, PlayerManual, PropertyManual, Card, GameStateManual, User, bcrypt 
+from server.models import db, PlayerManual, PropertyManual, Card, GameStateManual, User, bcrypt 
 import random
 
 # Initialize the Blueprint

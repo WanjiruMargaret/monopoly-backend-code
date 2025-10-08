@@ -1,7 +1,7 @@
 from app import app, db
 # Import all models needed for both versions (Manual is the one you are using)
-from models import Player, Property, ChestCard, GameState
-from models import PlayerManual, Card, PropertyManual, GameStateManual
+from server.models import Player, Property, ChestCard, GameState
+from server.models import PlayerManual, Card, PropertyManual, GameStateManual
 
 with app.app_context():
     db.drop_all()
