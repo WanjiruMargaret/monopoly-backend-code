@@ -1,8 +1,8 @@
 from flask import Flask
 from flask_migrate import Migrate
-from models import db, bcrypt # Import bcrypt to initialize it!
+from server.models import db, bcrypt # Import bcrypt to initialize it!
 from flask_cors import CORS
-from routes import api 
+from server.routes import api 
 
 app = Flask(__name__)
 

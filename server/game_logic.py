@@ -1,5 +1,5 @@
 import random
-from models import db, Player, Property, GameState, Card
+from server.models import db, Player, Property, GameState, Card
 
 def roll_dice_logic(player_id):
     player = Player.query.get(player_id)
